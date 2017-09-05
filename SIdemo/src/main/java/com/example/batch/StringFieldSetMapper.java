@@ -10,12 +10,6 @@ public class StringFieldSetMapper implements FieldSetMapper<SimpleMessage> {
 	public SimpleMessage mapFieldSet(FieldSet fieldSet) throws BindException {
 
 		final SimpleMessage msg = new SimpleMessage();
-
-		/*payment.setSourceAccountNo(fieldSet.readString("source"));
-		payment.setDestinationAccountNo(fieldSet.readString("destination"));
-		payment.setAmount(fieldSet.readBigDecimal("amount"));
-		payment.setDate(fieldSet.readDate("date"));
-*/
 		msg.setMessage(fieldSet.readString(0));
 		return msg;
 	}
