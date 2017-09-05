@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:int="http://www.springframework.org/schema/integration"
+	xmlns:batch="http://www.springframework.org/schema/batch"
+	xmlns:int-file="http://www.springframework.org/schema/integration/file"
+	xmlns:int-mail="http://www.springframework.org/schema/integration/mail"
+	xmlns:int-xml="http://www.springframework.org/schema/integration/xml"
+	xmlns:int-http="http://www.springframework.org/schema/integration/http"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:int-stream="http://www.springframework.org/schema/integration/stream"
+	xsi:schemaLocation="http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch.xsd
+						http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+						http://www.springframework.org/schema/integration http://www.springframework.org/schema/integration/spring-integration.xsd
+						http://www.springframework.org/schema/integration/stream http://www.springframework.org/schema/integration/stream/spring-integration-stream.xsd
+						http://www.springframework.org/schema/integration/file http://www.springframework.org/schema/integration/file/spring-integration-file.xsd
+						http://www.springframework.org/schema/integration/xml http://www.springframework.org/schema/integration/xml/spring-integration-xml.xsd
+						http://www.springframework.org/schema/integration/http http://www.springframework.org/schema/integration/http/spring-integration-http.xsd">
+
+	<int:poller default="true" fixed-rate="10000" />
+
+	<int-file:inbound-channel-adapter id="fileInBound"
+		directory="file:E://Projects_n_Code//CODE//sampledata//inbound" channel="fileChannel" />
+
+	<int:channel id="fileChannel"></int:channel>
+	
+	<int:transformer id="prepareJobLaunchRequest"
+		input-channel="fileChannel" output-channel="requests">
+		<bean class="com.example.batch.FileMessageToJobRequest">
+			<property name="job" ref="myBatch"/>
+			<property name="fileParameterName" value="input.file.name"/>
+		</bean>
+	</int:transformer>
+	
+	<int:channel id="requests"/>
+
+	<int:service-activator id="runJob" method="launch" input-channel="requests"
+		output-channel="statuses">
+		<bean class="org.springframework.batch.integration.launch.JobLaunchingMessageHandler">
+			<constructor-arg ref="jobLauncher"/>
+		</bean>
+	</int:service-activator>
+	
+	<int:channel id="statuses">
+		<int:queue capacity="10"/>
+	</int:channel>
+	
+	<bean id="jobLauncher" class="org.springframework.batch.core.launch.support.SimpleJobLauncher">
+		<property name="jobRepository" ref="jobRepository"></property>
+	</bean>
+	<bean id="jobRepository" class="org.springframework.batch.core.repository.support.MapJobRepositoryFactoryBean"></bean>
+	
+	<batch:job id="myBatch">
+		<batch:step id="loadPayments">
+			<batch:tasklet transaction-manager="transactionManager">
+				<batch:chunk reader="itemReader" writer="itemWriter" commit-interval="1">
+<!--  					<batch:skippable-exception-classes>
+						<batch:include class="org.springframework.batch.item.file.FlatFileParseException"/>
+					</batch:skippable-exception-classes> -->
+<!-- 					<batch:listeners>
+						<batch:listener>
+							<bean class="org.springframework.batch.integration.samples.payments.PaymentChunkListener"/>
+						</batch:listener>
+					</batch:listeners> -->
+				</batch:chunk>
+			</batch:tasklet>
+		</batch:step>
+		<batch:listeners>
+			<batch:listener ref="notificationExecutionsListener"/>
+		</batch:listeners>
+	</batch:job>
+	
+	<bean id="itemReader" class="org.springframework.batch.item.file.FlatFileItemReader" scope="step">
+		<property name="resource" value="file:///#{jobParameters['input.file.name']}" />
+		<property name="linesToSkip" value="1"/>
+		<property name="lineMapper">
+			<bean class="org.springframework.batch.item.file.mapping.DefaultLineMapper">
+				<property name="lineTokenizer">
+					<bean class="org.springframework.batch.item.file.transform.DelimitedLineTokenizer">
+						<property name="names" value="message" />
+						<property name="delimiter" value="\n" />
+					</bean>
+				</property>
+				<property name="fieldSetMapper">
+					<bean class="com.example.batch.StringFieldSetMapper" />
+				</property>
+			</bean>
+		</property>
+	</bean>
+	
+	<bean id="itemWriter" class="com.example.batch.SimpleMessageWriter">
+	</bean>
+	
+	<int:gateway id="notificationExecutionsListener"
+		service-interface="org.springframework.batch.core.JobExecutionListener"
+		default-request-channel="jobExecutions"/>
+
+	<int:channel id="jobExecutions"/>
+ 
+	<int:router id="executionsRouter" input-channel="jobExecutions">
+		<bean class="com.example.batch.JobExecutionsRouter"/>
+	</int:router>
+
+	<int:channel id="completeApplication">
+		<int:queue />
+	</int:channel>
+	<int:channel id="samplechannel">
+		<int:queue />
+	</int:channel>
+	
+	<bean id = "transactionManager"
+   		class = "org.springframework.batch.support.transaction.ResourcelessTransactionManager" />
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+<!-- 	<int-file:outbound-channel-adapter id="fileOutBound"
+		directory="file:E://Projects_n_Code//CODE//sampledata//outbound" channel="fileChannel">
+	</int-file:outbound-channel-adapter> -->
+
+
+<!-- 	<int:gateway id="requestGateway" 
+	             service-interface="org.springframework.integration.samples.http.RequestGateway"
+	             default-request-channel="requestChannel"/>
+	
+	<int:channel id="requestChannel"/>
+
+ 	<int-http:outbound-gateway request-channel="requestChannel" 
+					           url="http://localhost:8080/http/receiveGateway"
+					           http-method="GET"
+					           expected-response-type="java.lang.String"/> --> 
+	
+
+
+</beans>
